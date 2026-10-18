@@ -13,9 +13,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'AeroStock | Multi-Tenant Inventory Management',
+  title: 'PharmaHub | Multi-Tenant Inventory',
   description:
-    'Modern multi-tenant inventory control with strict data isolation, Supabase PostgreSQL, and granular 5-tier role-based access control.',
+    'PharmaHub multi-tenant inventory control with strict data isolation, Supabase PostgreSQL, and granular 5-tier role-based access control.',
 };
 
 export default function RootLayout({

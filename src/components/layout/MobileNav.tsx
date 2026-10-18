@@ -71,7 +71,7 @@ export function MobileNav({ user, isOpen, onClose }: MobileNavProps) {
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white shadow-xs">
               <Layers className="h-4 w-4 text-indigo-400" />
             </div>
-            <span className="text-base font-bold text-slate-900">AeroStock</span>
+            <span className="text-base font-bold text-slate-900">PharmaHub</span>
           </div>
           <button
             onClick={onClose}
