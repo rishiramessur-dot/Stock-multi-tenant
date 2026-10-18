@@ -109,7 +109,7 @@ export function AppSidebar({ user }: AppSidebarProps) {
         </div>
         <div>
           <span className="text-base font-bold tracking-tight text-slate-900">
-            AeroStock
+            PharmaHub
           </span>
           <span className="ml-1.5 text-[10px] font-semibold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded">
             v2.0
