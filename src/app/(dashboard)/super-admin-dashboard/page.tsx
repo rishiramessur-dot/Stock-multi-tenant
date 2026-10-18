@@ -21,8 +21,11 @@ import {
   Layers,
 } from 'lucide-react';
 import { MOCK_CORPORATES, MOCK_USERS, MOCK_INVENTORY_ITEMS } from '@/lib/supabase/mock-data';
+import { createClient } from '@supabase/supabase-js';
 import { getRoleBadgeStyle } from '@/lib/utils';
 import CreateTenantForm from '@/components/super-admin/CreateTenantForm';
+import DeleteTenantButton from '@/components/super-admin/DeleteTenantButton';
+import { Corporate, UserProfile } from '@/lib/types';
 
 export default async function SuperAdminDashboardPage() {
   const currentUser = await getCurrentUser();
@@ -32,9 +35,62 @@ export default async function SuperAdminDashboardPage() {
     redirect(currentUser?.corporate_id ? `/corporate/${currentUser.corporate_id}/dashboard` : '/login');
   }
 
-  const totalTenants = MOCK_CORPORATES.length;
-  const totalUsers = MOCK_USERS.length;
-  const totalItems = MOCK_INVENTORY_ITEMS.length;
+  let corporates: Corporate[] = [...MOCK_CORPORATES];
+  let users: (UserProfile & { name?: string })[] = [...MOCK_USERS];
+  let totalItems = MOCK_INVENTORY_ITEMS.length;
+
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const isLiveSupabase =
+    supabaseUrl &&
+    serviceRoleKey &&
+    !supabaseUrl.includes('placeholder-url') &&
+    !serviceRoleKey.includes('placeholder') &&
+    serviceRoleKey.length > 20;
+
+  if (isLiveSupabase) {
+    try {
+      const supabaseAdmin = createClient(supabaseUrl!, serviceRoleKey!, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      });
+      const { data: dbCorps } = await supabaseAdmin
+        .from('corporates')
+        .select('*, user_profiles(count), inventory_items(count)')
+        .order('created_at', { ascending: false });
+
+      if (dbCorps && dbCorps.length > 0) {
+        corporates = dbCorps.map((c: any) => ({
+          id: c.id,
+          name: c.name,
+          created_at: c.created_at,
+          member_count: c.user_profiles?.[0]?.count ?? 0,
+          item_count: c.inventory_items?.[0]?.count ?? 0,
+        }));
+      }
+
+      const { data: dbUsers } = await supabaseAdmin
+        .from('user_profiles')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (dbUsers && dbUsers.length > 0) {
+        users = dbUsers as any;
+      }
+
+      const { count: dbItemCount } = await supabaseAdmin
+        .from('inventory_items')
+        .select('*', { count: 'exact', head: true });
+
+      if (dbItemCount !== null) {
+        totalItems = dbItemCount;
+      }
+    } catch {
+      // Fallback to mock data gracefully
+    }
+  }
+
+  const totalTenants = corporates.length;
+  const totalUsers = users.length;
 
   return (
     <DashboardShell user={currentUser}>
@@ -179,42 +235,56 @@ export default async function SuperAdminDashboardPage() {
                       <th className="px-6 py-3.5">Corporate ID (UUID)</th>
                       <th className="px-6 py-3.5">Isolation Status</th>
                       <th className="px-6 py-3.5">Linked Members</th>
-                      <th className="px-6 py-3.5 text-right">Root Inspection</th>
+                      <th className="px-6 py-3.5 text-right">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {MOCK_CORPORATES.map((corp) => (
-                      <tr key={corp.id} className="hover:bg-slate-50/60 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs">
-                              {corp.name.slice(0, 2).toUpperCase()}
-                            </div>
-                            <span className="font-semibold text-slate-900">{corp.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 font-mono text-xs text-indigo-600 font-medium">
-                          {corp.id}
-                        </td>
-                        <td className="px-6 py-4">
-                          <Badge variant="success" dot>
-                            Strict RLS Enforced
-                          </Badge>
-                        </td>
-                        <td className="px-6 py-4 text-slate-600 font-medium">
-                          {corp.member_count} active accounts
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <Link
-                            href={`/corporate/${corp.id}/dashboard`}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
-                          >
-                            Inspect Workspace
-                            <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
-                          </Link>
+                    {corporates.length === 0 ? (
+                      <tr>
+                        <td colSpan={5} className="px-6 py-8 text-center text-slate-500 text-sm">
+                          No corporate tenants provisioned yet. Create one using the form on the left.
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      corporates.map((corp) => (
+                        <tr key={corp.id} className="hover:bg-slate-50/60 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white font-bold text-xs">
+                                {corp.name.slice(0, 2).toUpperCase()}
+                              </div>
+                              <span className="font-semibold text-slate-900">{corp.name}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 font-mono text-xs text-indigo-600 font-medium">
+                            {corp.id}
+                          </td>
+                          <td className="px-6 py-4">
+                            <Badge variant="success" dot>
+                              Strict RLS Enforced
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 text-slate-600 font-medium">
+                            {corp.member_count} active accounts
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <Link
+                                href={`/corporate/${corp.id}/dashboard`}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 bg-white border border-slate-300 rounded-lg hover:bg-slate-50 transition-colors"
+                              >
+                                Inspect Workspace
+                                <ExternalLink className="h-3.5 w-3.5 text-slate-400" />
+                              </Link>
+                              <DeleteTenantButton
+                                corporateId={corp.id}
+                                corporateName={corp.name}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -247,9 +317,9 @@ export default async function SuperAdminDashboardPage() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {MOCK_USERS.map((user) => {
+                    {users.map((user) => {
                       const style = getRoleBadgeStyle(user.role);
-                      const corp = MOCK_CORPORATES.find((c) => c.id === user.corporate_id);
+                      const corp = corporates.find((c) => c.id === user.corporate_id);
                       return (
                         <tr key={user.id} className="hover:bg-slate-50/60 transition-colors">
                           <td className="px-6 py-4">
